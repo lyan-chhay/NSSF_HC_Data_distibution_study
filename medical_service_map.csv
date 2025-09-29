@@ -1,0 +1,17 @@
+﻿លម្អិតសេវាព្យាបាល Detail Medical,សេវាព្យាបាល Sub-Medical,សេវាព្យាបាលគោល Medical,Actuarial Mapping ID
+មិនគួរមាន,មិនគួរមាន,មិនគួរមាន,0
+រលូត/រំលូត Abortion,សេវារលូត/រំលូត Abortion,សេវាសម្រាកព្យាបាល IPD,ABORT
+សំរាលកូន Deliveries,សេវាសម្រាលកូន Deliveries,សេវាសម្រាកព្យាបាល IPD,DELIV
+សង្គ្រោះបន្ទាន់ Emergency Services,សេវាសង្គ្រោះបន្ទាន់ Emergency Services,សេវាសម្រាកព្យាបាល IPD,EMERG
+សេវាទូទាត់ជាកញ្ចប់ FFS Package,សេវាសម្រាកព្យាបាលទូទាត់ជាកញ្ចប់ FFS Package,សេវាសម្រាកព្យាបាល IPD,FFSPA
+វ៉ាក់សាំង/សេរ៉ូម FFS Vaccination,សេវាពិគ្រោះជំងឺក្រៅ Out-patient,សេវាពិគ្រោះជំងឺក្រៅ OPD,FFSVA
+សម្រាកពេទ្យផ្នែករោគស្រ្តី IPD Gyneco,សេវាសម្រាកព្យាបាល In-patient,សេវាសម្រាកព្យាបាល IPD,IPDGY
+សម្រាកពេទ្យផ្នែកជំងឺទូទៅ IPD Medicine,សេវាសម្រាកព្យាបាល In-patient,សេវាសម្រាកព្យាបាល IPD,IPDME
+សម្រាកពេទ្យផ្នែកជំងឺកុមារ IPD Pediatric,សេវាសម្រាកព្យាបាល In-patient,សេវាសម្រាកព្យាបាល IPD,IPDPE
+សម្រាកពេទ្យផ្នែកសល្យសាស្រ្ត IPD Surgery,សេវាសម្រាកព្យាបាល In-patient,សេវាសម្រាកព្យាបាល IPD,IPDSU
+ពិគ្រោះជំងឺក្រៅ OPD Consultation,សេវាពិគ្រោះជំងឺក្រៅ Out-patient,សេវាពិគ្រោះជំងឺក្រៅ OPD,OPDCS
+សេវាបង្ការនិងពន្យារកំណើត OPD Contraceptive,សេវាពិគ្រោះជំងឺក្រៅ Out-patient,សេវាពិគ្រោះជំងឺក្រៅ OPD,OPDCT
+វះកាត់តូច OPD Minor Surgery,សេវាពិគ្រោះជំងឺក្រៅ Out-patient,សេវាពិគ្រោះជំងឺក្រៅ OPD,OPDMI
+សង្រ្គោះ/សង្គ្រោះបញ្ជូន OPD Preliminary Emergency,សេវាពិគ្រោះជំងឺក្រៅ Out-patient,សេវាពិគ្រោះជំងឺក្រៅ OPD,OPDPR
+វះកាត់ធំ Major Surgery,សេវាវះកាត់ Surgery,សេវាសម្រាកព្យាបាល IPD,SURMA
+វះកាត់មធ្យម Medium Surgery,សេវាវះកាត់ Surgery,សេវាសម្រាកព្យាបាល IPD,SURME
