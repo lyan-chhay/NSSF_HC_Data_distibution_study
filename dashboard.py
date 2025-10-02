@@ -1,256 +1,291 @@
+
+
+
+
+
+
 # import os
+# import glob
+# from collections import Counter
 # import streamlit as st
+# from PIL import Image
 
-# # Base directories
-# BOXPLOT_DIR = "results/total_amount/boxplot"
-# DIST_DIR = "results/total_amount/distributions"
+# # ------- CONFIG -------
+# BOXPLOT_DIR = os.path.join("Plots", "total_amount", "boxplot")
+# DIST_DIR = os.path.join("Plots", "total_amount", "distributions")
+# FILTER_ORDER = ["DetailMedical", "Sub-LevelofCare", "Sub-Scheme3"]
+# # ----------------------
 
-# # --- Helper functions ---
-# def collect_files(base_dir):
-#     files = []
-#     for root, _, fns in os.walk(base_dir):
-#         for f in fns:
-#             if f.endswith(".png"):
-#                 rel_path = os.path.relpath(os.path.join(root, f), base_dir)
-#                 parts = rel_path.split(os.sep)
-#                 files.append(parts)
-#     return files
+# st.set_page_config(page_title="Plot viewer", layout="wide")
 
-# def build_index(files, base_dir):
-#     data = []
-#     for parts in files:
-#         if len(parts) == 3:  # Sub-Medical/Sub-Level/Sub-Scheme.png
-#             sub_medical = parts[0]
-#             sub_level = parts[1]
-#             sub_scheme = parts[2].replace(".png", "")
-#             data.append({
-#                 "Sub-Medical": sub_medical,
-#                 "Sub-Level": sub_level,
-#                 "Sub-Scheme": sub_scheme,
-#                 "path": os.path.join(base_dir, *parts)
-#             })
-#     return data
+# def parse_filename_to_kv(fname_no_ext):
+#     parts = fname_no_ext.split("_")
+#     kv = {}
+#     current_k = None
+#     current_v = None
 
-# def resolve_path(data, medical, level, scheme, base_dir):
-#     if medical is None:
-#         return None  # nothing to load
-#     if level == "None" and scheme == "None":
-#         # Top-level plot
-#         path = os.path.join(base_dir, medical + ".png")
-#         return path if os.path.exists(path) else None
-#     elif scheme == "None":
-#         # Sub-Level only
-#         path = os.path.join(base_dir, medical, f"{level}.png")
-#         return path if os.path.exists(path) else None
-#     else:
-#         # Full drill-down
-#         match = next((d for d in data if
-#                       d["Sub-Medical"] == medical and
-#                       d["Sub-Level"] == level and
-#                       d["Sub-Scheme"] == scheme), None)
-#         return match["path"] if match else None
-
-# # --- Load data ---
-# boxplot_data = build_index(collect_files(BOXPLOT_DIR), BOXPLOT_DIR)
-# dist_data = build_index(collect_files(DIST_DIR), DIST_DIR)
-
-# # --- Streamlit config ---
-# st.set_page_config(layout="wide")
-# st.sidebar.title("Filters")
-
-# # --- Session state initialization ---
-# for key in ["selected_medical", "selected_level", "selected_scheme"]:
-#     if key not in st.session_state:
-#         if key == "selected_level" or key == "selected_scheme":
-#             st.session_state[key] = "None"  # bottom filters default to "None"
+#     for part in parts:
+#         if "=" in part:
+#             if current_k is not None:
+#                 kv[current_k] = current_v
+#             k, v = part.split("=", 1)
+#             current_k = k.strip()
+#             current_v = v.strip()
 #         else:
-#             st.session_state[key] = None
+#             if current_k is not None:
+#                 current_v = current_v + "_" + part
+#             else:
+#                 continue
 
-# # --- Prepare filter options ---
-# sub_medicals = sorted(set(d["Sub-Medical"] for d in boxplot_data))
+#     if current_k is not None:
+#         kv[current_k] = current_v
 
-# # --- Reset button ---
-# if st.sidebar.button("Reset filters"):
-#     st.session_state.selected_medical = sub_medicals[0]  # reset first medical
-#     st.session_state.selected_level = "None"
-#     st.session_state.selected_scheme = "None"
+#     return kv
 
-# # --- Filter widgets bound to session_state ---
-# selected_medical = st.sidebar.selectbox(
-#     "Sub-Medical",
-#     options=sub_medicals,
-#     key="selected_medical"
-# )
+# @st.cache_data(show_spinner=False)
+# def scan_plot_files(directory):
+#     pattern = os.path.join(directory, "*.png")
+#     files = glob.glob(pattern)
+#     records = []
+#     key_counter = Counter()
 
-# filtered_level = [d for d in boxplot_data if d["Sub-Medical"] == selected_medical]
-# level_options = ["None"] + sorted(set(d["Sub-Level"] for d in filtered_level))
-# selected_level = st.sidebar.selectbox(
-#     "Sub-Level of Care",
-#     options=level_options,
-#     key="selected_level"
-# )
+#     for fpath in files:
+#         fname = os.path.splitext(os.path.basename(fpath))[0]
+#         kv = parse_filename_to_kv(fname)
+#         for k in kv.keys():
+#             key_counter[k] += 1
+#         records.append({"path": fpath, "kv": kv, "basename": fname})
 
-# if selected_level != "None":
-#     filtered_scheme = [d for d in filtered_level if d["Sub-Level"] == selected_level]
-#     scheme_options = ["None"] + sorted(set(d["Sub-Scheme"] for d in filtered_scheme))
-# else:
-#     scheme_options = ["None"]
+#     return records, key_counter
 
-# selected_scheme = st.sidebar.selectbox(
-#     "Sub-Scheme 3",
-#     options=scheme_options,
-#     key="selected_scheme"
-# )
+# # scan both dirs
+# records_box, key_counter_box = scan_plot_files(BOXPLOT_DIR) if os.path.isdir(BOXPLOT_DIR) else ([], Counter())
+# records_dist, key_counter_dist = scan_plot_files(DIST_DIR) if os.path.isdir(DIST_DIR) else ([], Counter())
 
-# # --- Resolve image paths safely ---
-# dist_path = resolve_path(dist_data, selected_medical, selected_level, selected_scheme, DIST_DIR)
-# boxplot_path = resolve_path(boxplot_data, selected_medical, selected_level, selected_scheme, BOXPLOT_DIR)
+# # combine keys across both dirs
+# all_keys = list((key_counter_box + key_counter_dist).keys())
+# chosen_keys = [k for k in FILTER_ORDER if k in all_keys]
 
-# # --- Display ---
-# st.markdown(f"### {selected_medical} | {selected_level} | {selected_scheme}")
+# # sidebar filters
+# prev_selections = {}
+# for key in chosen_keys:
+#     candidate_records = records_box + records_dist
+#     for pk, sel in prev_selections.items():
+#         if sel is None or sel == "(All)":
+#             continue
+#         candidate_records = [r for r in candidate_records if r["kv"].get(pk) == sel]
 
-# # Distribution on top
-# if dist_path:
-#     st.image(dist_path, caption="Distribution", use_container_width=True)
-# else:
-#     st.warning("No distribution plot available for this selection.")
+#     available_vals = sorted({r["kv"].get(key) for r in candidate_records if r["kv"].get(key) is not None})
+#     options = ["(All)"] + available_vals
+#     sel = st.sidebar.selectbox(key, options, index=0, key=f"sel_{key}")
+#     prev_selections[key] = sel
 
-# # Boxplot below
-# if boxplot_path:
-#     st.image(boxplot_path, caption="Boxplot", use_container_width=True)
-# else:
-#     st.warning("No boxplot available for this selection.")
+# # Function to build the canonical filename from selections, dropping the =All parts
+# def build_canonical_filename(kv_map, key_order):
+#     parts = []
+#     for k in key_order:
+#         val = kv_map.get(k)
+#         if val is None or val == "(All)":
+#             continue
+#         parts.append(f"{k}={val}")
+#     return "_".join(parts) + ".png" if parts else None
+
+# def get_matching_plot(records_all, prev_selections, plots_dir, chosen_keys):
+#     matching = []
+#     if prev_selections:
+#         canonical_fname = build_canonical_filename(prev_selections, chosen_keys)
+#         canonical_path = os.path.join(plots_dir, canonical_fname) if canonical_fname else None
+
+#         if canonical_path and os.path.isfile(canonical_path):
+#             matching = [{"path": canonical_path}]
+#         else:
+#             # fallback: find original file with Alls still present
+#             candidates = []
+#             for r in records_all:
+#                 ok = True
+#                 for k, sel in prev_selections.items():
+#                     if sel == "(All)":
+#                         if r["kv"].get(k) != "(All)":
+#                             ok = False
+#                             break
+#                     else:
+#                         if r["kv"].get(k) != sel:
+#                             ok = False
+#                             break
+#                 if ok:
+#                     candidates.append(r)
+#             matching = candidates
+#     return matching
+
+# # get matching plots
+# matching_box = get_matching_plot(records_box, prev_selections, BOXPLOT_DIR, chosen_keys)
+# matching_dist = get_matching_plot(records_dist, prev_selections, DIST_DIR, chosen_keys)
+
+# # display stacked vertically
+# if matching_box:
+#     st.subheader("Boxplot")
+#     for rec in matching_box:
+#         st.image(rec["path"] if isinstance(rec, dict) else rec, use_container_width=True)
+
+# if matching_dist:
+#     st.subheader("Distribution")
+#     for rec in matching_dist:
+#         st.image(rec["path"] if isinstance(rec, dict) else rec, use_container_width=True)
+
 
 
 import os
+import glob
+from collections import Counter
 import streamlit as st
 
-# --- Base directories for both options ---
-DATA_OPTIONS = {
-    "Total Amount": "results/total_amount",
-    "FFS Amount": "results/ffs_amount"
-}
+# ------- CONFIG -------
+DATASETS = ["total_amount", "ffs_amount", "CB_amount", "medical_stay_day", "sickleave_day"]
+FILTER_ORDER = ["DetailMedical", "Sub-LevelofCare", "Sub-Scheme3"]
+# ----------------------
 
-# --- Helper functions ---
-def collect_files(base_dir):
-    files = []
-    for root, _, fns in os.walk(base_dir):
-        for f in fns:
-            if f.endswith(".png"):
-                rel_path = os.path.relpath(os.path.join(root, f), base_dir)
-                parts = rel_path.split(os.sep)
-                files.append(parts)
-    return files
+st.set_page_config(page_title="Plot viewer", layout="wide")
 
-def build_index(files, base_dir):
-    data = []
-    for parts in files:
-        if len(parts) == 3:  # Sub-Medical/Sub-Level/Sub-Scheme.png
-            sub_medical = parts[0]
-            sub_level = parts[1]
-            sub_scheme = parts[2].replace(".png", "")
-            data.append({
-                "Sub-Medical": sub_medical,
-                "Sub-Level": sub_level,
-                "Sub-Scheme": sub_scheme,
-                "path": os.path.join(base_dir, *parts)
-            })
-    return data
-
-def resolve_path(data, medical, level, scheme, base_dir):
-    if medical is None:
-        return None
-    if level == "None" and scheme == "None":
-        path = os.path.join(base_dir, medical + ".png")
-        return path if os.path.exists(path) else None
-    elif scheme == "None":
-        path = os.path.join(base_dir, medical, f"{level}.png")
-        return path if os.path.exists(path) else None
-    else:
-        match = next((d for d in data if
-                      d["Sub-Medical"] == medical and
-                      d["Sub-Level"] == level and
-                      d["Sub-Scheme"] == scheme), None)
-        return match["path"] if match else None
-
-# --- Streamlit config ---
-st.set_page_config(layout="wide")
-st.sidebar.title("Data Selection")
-
-# --- Top-level option: dataset selection ---
-selected_dataset = st.sidebar.selectbox("Select Dataset", list(DATA_OPTIONS.keys()))
-
-
-st.sidebar.title("Filters")
-# --- Base directories for selected dataset ---
-BASE_DIR = DATA_OPTIONS[selected_dataset]
-BOXPLOT_DIR = os.path.join(BASE_DIR, "boxplot")
-DIST_DIR = os.path.join(BASE_DIR, "distributions")
-
-# --- Load data ---
-boxplot_data = build_index(collect_files(BOXPLOT_DIR), BOXPLOT_DIR)
-dist_data = build_index(collect_files(DIST_DIR), DIST_DIR)
-
-# --- Session state initialization ---
-for key in ["selected_medical", "selected_level", "selected_scheme"]:
-    if key not in st.session_state:
-        if key in ["selected_level", "selected_scheme"]:
-            st.session_state[key] = "None"
+def parse_filename_to_kv(fname_no_ext):
+    parts = fname_no_ext.split("_")
+    kv = {}
+    current_k = None
+    current_v = None
+    for part in parts:
+        if "=" in part:
+            if current_k is not None:
+                kv[current_k] = current_v
+            k, v = part.split("=", 1)
+            current_k = k.strip()
+            current_v = v.strip()
         else:
-            st.session_state[key] = None
+            if current_k is not None:
+                current_v = current_v + "_" + part
+    if current_k is not None:
+        kv[current_k] = current_v
+    return kv
 
-# --- Prepare filter options ---
-sub_medicals = sorted(set(d["Sub-Medical"] for d in boxplot_data))
+@st.cache_data(show_spinner=False)
+def scan_plot_files(directory):
+    pattern = os.path.join(directory, "*.png")
+    files = glob.glob(pattern)
+    records = []
+    key_counter = Counter()
+    for fpath in files:
+        fname = os.path.splitext(os.path.basename(fpath))[0]
+        kv = parse_filename_to_kv(fname)
+        for k in kv.keys():
+            key_counter[k] += 1
+        records.append({"path": fpath, "kv": kv, "basename": fname})
+    return records, key_counter
 
-# --- Reset button ---
+# --- dataset selector ---
+dataset_choice = st.sidebar.selectbox("Dataset", DATASETS, index=0)
+
+# paths for this dataset
+BOXPLOT_DIR = os.path.join("Plots", dataset_choice, "boxplot")
+DIST_DIR = os.path.join("Plots", dataset_choice, "distributions")
+
+# scan both dirs
+records_box, key_counter_box = scan_plot_files(BOXPLOT_DIR) if os.path.isdir(BOXPLOT_DIR) else ([], Counter())
+records_dist, key_counter_dist = scan_plot_files(DIST_DIR) if os.path.isdir(DIST_DIR) else ([], Counter())
+all_keys = list((key_counter_box + key_counter_dist).keys())
+chosen_keys = [k for k in FILTER_ORDER if k in all_keys]
+
+# --- reset button ---
 if st.sidebar.button("Reset filters"):
-    st.session_state.selected_medical = sub_medicals[0]
-    st.session_state.selected_level = "None"
-    st.session_state.selected_scheme = "None"
+    for key in chosen_keys:
+        if f"sel_{key}" in st.session_state:
+            st.session_state[f"sel_{key}"] = "(All)"
 
-# --- Filter widgets bound to session_state ---
-selected_medical = st.sidebar.selectbox(
-    "Sub-Medical",
-    options=sub_medicals,
-    key="selected_medical"
-)
 
-filtered_level = [d for d in boxplot_data if d["Sub-Medical"] == selected_medical]
-level_options = ["None"] + sorted(set(d["Sub-Level"] for d in filtered_level))
-selected_level = st.sidebar.selectbox(
-    "Sub-Level of Care",
-    options=level_options,
-    key="selected_level"
-)
 
-if selected_level != "None":
-    filtered_scheme = [d for d in filtered_level if d["Sub-Level"] == selected_level]
-    scheme_options = ["None"] + sorted(set(d["Sub-Scheme"] for d in filtered_scheme))
+# --- initialize session_state for filters ---
+for key in chosen_keys:
+    state_key = f"sel_{key}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = "(All)"
+
+# --- adaptive selectboxes ---
+prev_selections = {}
+for i, key in enumerate(chosen_keys):
+    # start with all records, then filter by previously selected filters
+    candidate_records = records_box + records_dist
+    for pk, sel in prev_selections.items():
+        if sel == "(All)":
+            continue
+        candidate_records = [r for r in candidate_records if r["kv"].get(pk) == sel]
+
+    # available options for this filter
+    available_vals = sorted({r["kv"].get(key) for r in candidate_records if r["kv"].get(key) is not None})
+    options = ["(All)"] + available_vals
+
+    # keep previous selection if still valid
+    state_key = f"sel_{key}"
+    if st.session_state[state_key] not in options:
+        st.session_state[state_key] = "(All)"
+
+    st.session_state[state_key] = st.sidebar.selectbox(
+        key, options, index=options.index(st.session_state[state_key])
+    )
+
+    prev_selections[key] = st.session_state[state_key]
+
+
+
+# --- filename builder ---
+def build_canonical_filename(kv_map, key_order):
+    parts = []
+    for k in key_order:
+        val = kv_map.get(k)
+        if val is None or val == "(All)":
+            continue
+        parts.append(f"{k}={val}")
+    return "_".join(parts) + ".png" if parts else None
+
+def get_matching_plot(records_all, prev_selections, plots_dir, chosen_keys):
+    matching = []
+    if prev_selections:
+        canonical_fname = build_canonical_filename(prev_selections, chosen_keys)
+        canonical_path = os.path.join(plots_dir, canonical_fname) if canonical_fname else None
+        if canonical_path and os.path.isfile(canonical_path):
+            matching = [{"path": canonical_path}]
+        else:
+            # fallback
+            candidates = []
+            for r in records_all:
+                ok = True
+                for k, sel in prev_selections.items():
+                    if sel == "(All)":
+                        if r["kv"].get(k) != "(All)":
+                            ok = False
+                            break
+                    else:
+                        if r["kv"].get(k) != sel:
+                            ok = False
+                            break
+                if ok:
+                    candidates.append(r)
+            matching = candidates
+    return matching
+
+# --- get matching plots ---
+matching_box = get_matching_plot(records_box, prev_selections, BOXPLOT_DIR, chosen_keys)
+matching_dist = get_matching_plot(records_dist, prev_selections, DIST_DIR, chosen_keys)
+
+# --- display vertically ---
+
+if matching_dist:
+    st.subheader(f"Distribution - {dataset_choice}")
+    for rec in matching_dist:
+        st.image(rec["path"] if isinstance(rec, dict) else rec, use_container_width=True)
 else:
-    scheme_options = ["None"]
+    st.info("No distribution found for this selection.")
 
-selected_scheme = st.sidebar.selectbox(
-    "Sub-Scheme 3",
-    options=scheme_options,
-    key="selected_scheme"
-)
 
-# --- Resolve image paths safely ---
-dist_path = resolve_path(dist_data, selected_medical, selected_level, selected_scheme, DIST_DIR)
-boxplot_path = resolve_path(boxplot_data, selected_medical, selected_level, selected_scheme, BOXPLOT_DIR)
-
-# --- Display ---
-st.markdown(f"### Dataset: {selected_dataset} | {selected_medical} | {selected_level} | {selected_scheme}")
-
-# Distribution on top
-if dist_path:
-    st.image(dist_path, caption="Distribution", use_container_width=True)
+if matching_box:
+    st.subheader(f"Boxplot - {dataset_choice}")
+    for rec in matching_box:
+        st.image(rec["path"] if isinstance(rec, dict) else rec, use_container_width=True)
 else:
-    st.warning("No distribution plot available for this selection.")
-
-# Boxplot below
-if boxplot_path:
-    st.image(boxplot_path, caption="Boxplot", use_container_width=True)
-else:
-    st.warning("No boxplot available for this selection.")
-
+    st.info("No boxplot found for this selection.")
